@@ -13,7 +13,7 @@ interface Props {
   onRetryAccess?: () => void;
 }
 
-const BACKEND_URL = "https://spotless-pseudoskeletal-kynlee.ngrok-free.dev";
+const BACKEND_URL = "https://stripe-backend-ency.onrender.com";
 
 const PRICE_IDS: Record<SubscriptionPlan, string> = {
   monthly: "price_1So6v8CJ7mMdErWwHG9Js6eL",
@@ -73,7 +73,6 @@ const PaymentScreen: React.FC<Props> = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Accept: "application/json",
         },
         body: JSON.stringify({ email, priceId, returnUrl }),
