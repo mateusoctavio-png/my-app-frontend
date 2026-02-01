@@ -13,7 +13,7 @@ interface Props {
   onRetryAccess?: () => void;
 }
 
-const BACKEND_URL = "https://stripe-backend-ency.onrender.com";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 const PRICE_IDS: Record<SubscriptionPlan, string> = {
   monthly: "price_1So6v8CJ7mMdErWwHG9Js6eL",
