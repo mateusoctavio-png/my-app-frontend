@@ -27,7 +27,7 @@ import HabitTracker from "./components/HabitTracker";
 import PaymentScreen from "./components/PaymentScreen";
 import ProfileSection from "./components/ProfileSection";
 
-const BACKEND_URL = "https://spotless-pseudoskeletal-kynlee.ngrok-free.dev";
+const BACKEND_URL = "https://stripe-backend-ency.onrender.com";
 
 // ✅ tipo local (não depende de outros arquivos)
 type AccessStatus = "idle" | "checking" | "granted" | "denied";
@@ -102,7 +102,6 @@ const [accessError, setAccessError] = useState<string | null>(null);
       {
         signal: controller.signal,
         headers: {
-          "ngrok-skip-browser-warning": "true",
           Accept: "application/json",
         },
       }
@@ -174,8 +173,7 @@ const [accessError, setAccessError] = useState<string | null>(null);
         `${BACKEND_URL}/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
         {
           headers: {
-            Accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
+            Accept: "application/json"
           },
         }
       );
