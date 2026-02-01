@@ -27,7 +27,7 @@ import HabitTracker from "./components/HabitTracker";
 import PaymentScreen from "./components/PaymentScreen";
 import ProfileSection from "./components/ProfileSection";
 
-const BACKEND_URL = "https://stripe-backend-ency.onrender.com";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 // ✅ tipo local (não depende de outros arquivos)
 type AccessStatus = "idle" | "checking" | "granted" | "denied";
