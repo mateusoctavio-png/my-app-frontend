@@ -11,9 +11,15 @@ interface Props {
   isBlocking?: boolean;
   onLogout?: () => void;
   onRetryAccess?: () => void;
+
+  // ✅ só para feedback visual
+  status?: "idle" | "checking" | "granted" | "denied";
+  error?: string | null;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL =
+  (import.meta as any)?.env?.VITE_BACKEND_URL ||
+  "https://stripe-backend-ency.onrender.com"; // ✅ troque se sua URL do Render for outra
 
 const PRICE_IDS: Record<SubscriptionPlan, string> = {
   monthly: "price_1So6v8CJ7mMdErWwHG9Js6eL",
@@ -28,6 +34,8 @@ const PaymentScreen: React.FC<Props> = ({
   isBlocking,
   onLogout,
   onRetryAccess,
+  status,
+  error,
 }) => {
   const t = TRANSLATIONS[language];
   const config = THEME_CONFIG[theme];
@@ -41,6 +49,7 @@ const PaymentScreen: React.FC<Props> = ({
       name: t.planMonthly,
       price: "R$ 6,90 / mês",
       features: [t.cancelAnytime, t.autoRenew],
+      badge: null as any,
     },
     {
       id: "semestral" as SubscriptionPlan,
@@ -66,8 +75,8 @@ const PaymentScreen: React.FC<Props> = ({
       const priceId = PRICE_IDS[planId];
       const email = user.email;
 
-      // ✅ returnUrl (seu backend pode exigir)
-      const returnUrl = window.location.origin + window.location.pathname;
+      // ✅ volta para o app na mesma origem (Vercel/Preview)
+      const returnUrl = window.location.origin;
 
       const res = await fetch(`${BACKEND_URL}/create-checkout-session`, {
         method: "POST",
@@ -92,22 +101,8 @@ const PaymentScreen: React.FC<Props> = ({
         return;
       }
 
-      // ✅ Stripe Checkout não roda em iframe: abre em nova aba.
-      // fallback: tenta navegar no topo
-      let opened: Window | null = null;
-      try {
-        opened = window.open(data.url, "_blank", "noopener,noreferrer");
-      } catch {
-        opened = null;
-      }
-
-      if (!opened) {
-        try {
-          (window.top ?? window).location.href = data.url;
-        } catch {
-          window.location.href = data.url;
-        }
-      }
+      // ✅ Produção: Stripe funciona em top-level, então redireciona na mesma aba
+      (window.top ?? window).location.href = data.url;
     } catch (err) {
       console.error("Erro ao iniciar checkout:", err);
       setErrorMsg("Falha ao iniciar checkout. Verifique o backend.");
@@ -123,7 +118,9 @@ const PaymentScreen: React.FC<Props> = ({
       }`}
     >
       <div className="text-center mb-10">
-        <div className={`mx-auto h-20 w-20 rounded-3xl ${config.primary} flex items-center justify-center text-white text-4xl font-bold shadow-2xl mb-6`}>
+        <div
+          className={`mx-auto h-20 w-20 rounded-3xl ${config.primary} flex items-center justify-center text-white text-4xl font-bold shadow-2xl mb-6`}
+        >
           My.
         </div>
 
@@ -132,7 +129,17 @@ const PaymentScreen: React.FC<Props> = ({
           Seu acesso está bloqueado. Escolha um plano abaixo para continuar usando o app.
         </p>
 
-        {errorMsg && <p className="mt-4 text-sm font-black text-red-500">{errorMsg}</p>}
+        {(errorMsg || error) && (
+          <p className="mt-4 text-sm font-black text-red-500">
+            {errorMsg || error}
+          </p>
+        )}
+
+        {status === "checking" && (
+          <p className="mt-3 text-xs font-bold text-slate-500">
+            Verificando acesso…
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -194,13 +201,18 @@ const PaymentScreen: React.FC<Props> = ({
           Já paguei — verificar novamente
         </button>
 
-        <button className="w-full py-4 rounded-2xl font-black border border-slate-200" onClick={onLogout}>
+        <button
+          className="w-full py-4 rounded-2xl font-black border border-slate-200"
+          onClick={onLogout}
+        >
           Sair
         </button>
       </div>
 
       <div className="mt-12 text-center">
-        <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-6">Pagamento Seguro com</p>
+        <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-6">
+          Pagamento Seguro com
+        </p>
         <div className="flex justify-center items-center gap-8 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
           <div className="flex items-center gap-2 font-black text-xl">
             <Smartphone size={24} /> Apple Pay
@@ -218,5 +230,3 @@ const PaymentScreen: React.FC<Props> = ({
 };
 
 export default PaymentScreen;
-
-
