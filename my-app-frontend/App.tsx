@@ -27,9 +27,10 @@ import HabitTracker from "./components/HabitTracker";
 import PaymentScreen from "./components/PaymentScreen";
 import ProfileSection from "./components/ProfileSection";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL =
+  (import.meta as any)?.env?.VITE_BACKEND_URL ||
+  "https://stripe-backend-ency.onrender.com"; // ✅ troque se sua URL do Render for outra
 
-// ✅ tipo local (não depende de outros arquivos)
 type AccessStatus = "idle" | "checking" | "granted" | "denied";
 
 const App: React.FC = () => {
@@ -42,12 +43,9 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState("home");
   const [searchQuery, setSearchQuery] = useState("");
 
-type AccessStatus = "idle" | "checking" | "granted" | "denied";
-
-// ✅ Controle de acesso pelo backend
-const [accessStatus, setAccessStatus] = useState<AccessStatus>("idle");
-const [accessError, setAccessError] = useState<string | null>(null);
-
+  // ✅ Controle de acesso
+  const [accessStatus, setAccessStatus] = useState<AccessStatus>("idle");
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   // Estados Globais
   const [allTasks, setAllTasks] = useState<Task[]>([]);
@@ -62,11 +60,8 @@ const [accessError, setAccessError] = useState<string | null>(null);
   const [allArticles, setAllArticles] = useState<Article[]>([]);
   const [categoryConfigs, setCategoryConfigs] = useState<CategoryItem[]>([]);
 
-  const getTodayISO = () => {
-    return new Date().toLocaleDateString("sv-SE", {
-      timeZone: "America/Sao_Paulo",
-    });
-  };
+  const getTodayISO = () =>
+    new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
 
   const initialDynamicCategories = [
     "work",
@@ -88,50 +83,46 @@ const [accessError, setAccessError] = useState<string | null>(null);
     "commitments",
   ];
 
-  // ✅ Checar acesso no backend (retorna boolean)
+  // ✅ Checar acesso no backend (RETORNA boolean)
   const checkAccess = async (email: string): Promise<boolean> => {
-  setAccessStatus("checking");
-  setAccessError(null);
+    setAccessStatus("checking");
+    setAccessError(null);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
-  try {
-    const res = await fetch(
-      `${BACKEND_URL}/access?email=${encodeURIComponent(email)}`,
-      {
-        signal: controller.signal,
-        headers: {
-          Accept: "application/json",
-        },
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/access?email=${encodeURIComponent(email)}`,
+        {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        setAccessStatus("denied");
+        setAccessError("Falha ao verificar acesso (backend).");
+        return false;
       }
-    );
 
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok || !data) {
+      const ok = data.has_access === true;
+      setAccessStatus(ok ? "granted" : "denied");
+      return ok;
+    } catch (err: any) {
       setAccessStatus("denied");
-      setAccessError("Falha ao verificar acesso (backend).");
+      setAccessError(
+        err?.name === "AbortError"
+          ? "Tempo esgotado ao verificar acesso."
+          : "Falha ao verificar acesso."
+      );
       return false;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const ok = data.has_access === true;
-
-    setAccessStatus(ok ? "granted" : "denied");
-    return ok;
-  } catch (err: any) {
-    setAccessStatus("denied");
-    setAccessError(
-      err?.name === "AbortError"
-        ? "Tempo esgotado ao verificar acesso."
-        : "Falha ao verificar acesso."
-    );
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
+  };
 
   // ✅ Recuperar sessão
   useEffect(() => {
@@ -148,7 +139,7 @@ const [accessError, setAccessError] = useState<string | null>(null);
     }
   }, []);
 
-  // ✅ Sempre que logar, checa acesso
+  // ✅ Sempre que logar, checa acesso (gate)
   useEffect(() => {
     if (isLoggedIn && user?.email) {
       checkAccess(user.email);
@@ -159,38 +150,46 @@ const [accessError, setAccessError] = useState<string | null>(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, user?.email]);
 
-  // ✅ Retorno do Stripe (opção B): retry confirmando checkout-status e depois checa acesso
+  // ✅ Retorno do Stripe: confirma e re-checa acesso
   useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const checkout = params.get("checkout");
-  const sessionId = params.get("session_id");
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    const sessionId = params.get("session_id");
 
-  if (checkout !== "success" || !sessionId || !user?.email) return;
+    if (checkout !== "success" || !sessionId) return;
+    if (!user?.email) return;
 
-  const confirm = async () => {
-    try {
-      await fetch(
-        `${BACKEND_URL}/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
-        {
-          headers: {
-            Accept: "application/json"
-          },
-        }
-      );
+    const confirm = async () => {
+      try {
+        setAccessStatus("checking");
+        setAccessError(null);
 
-      // força nova checagem de acesso
-      await checkAccess(user.email);
+        const r = await fetch(
+          `${BACKEND_URL}/checkout-status?session_id=${encodeURIComponent(
+            sessionId
+          )}`,
+          { headers: { Accept: "application/json" } }
+        );
 
-      // limpa URL
-      window.history.replaceState({}, "", window.location.pathname);
-    } catch (e) {
-      console.error("Erro ao confirmar checkout:", e);
-    }
-  };
+        // mesmo se o backend só responder ok:true, a gente re-checa o /access
+        await r.json().catch(() => null);
 
-  confirm();
-}, [user?.email]);
+        await checkAccess(user.email);
 
+        // limpa query da URL
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch (e) {
+        console.error("Erro ao confirmar checkout:", e);
+        setAccessStatus("denied");
+        setAccessError(
+          "Não consegui confirmar o pagamento agora. Clique em “Já paguei — verificar novamente”."
+        );
+      }
+    };
+
+    confirm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email]);
 
   // ✅ Carregar dados quando loga (seu original)
   useEffect(() => {
@@ -373,9 +372,14 @@ const [accessError, setAccessError] = useState<string | null>(null);
       createdAt: new Date().toISOString(),
       subscriptionPlan: undefined,
     };
+
     setUser(userData);
     setIsLoggedIn(true);
     localStorage.setItem("my_app_session", JSON.stringify(userData));
+
+    // ✅ assim que logar, já coloca em "checking"
+    setAccessStatus("checking");
+    setAccessError(null);
   };
 
   const handleLogout = () => {
@@ -440,20 +444,21 @@ const [accessError, setAccessError] = useState<string | null>(null);
     );
   }
 
-  // ✅ Acesso negado => tela de planos
+  // ✅ GATE ABSOLUTO: se NÃO for granted, fica na tela de pagamento
   if (accessStatus !== "granted") {
-  return (
-    <PaymentScreen
-      theme={theme}
-      language={language}
-      user={user!}
-      isBlocking
-      onLogout={handleLogout}
-      onRetryAccess={() => checkAccess(user!.email)}
-    />
-  );
-}
-
+    return (
+      <PaymentScreen
+        theme={theme}
+        language={language}
+        user={user!}
+        isBlocking
+        onLogout={handleLogout}
+        onRetryAccess={() => user?.email && checkAccess(user.email)}
+        status={accessStatus}
+        error={accessError}
+      />
+    );
+  }
 
   // ✅ Acesso liberado => app normal
   const renderView = () => {
@@ -599,16 +604,8 @@ const [accessError, setAccessError] = useState<string | null>(null);
       <main className="flex-1 relative overflow-y-auto overflow-x-hidden custom-scrollbar">
         {renderView()}
       </main>
-
-      {accessError && (
-        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[420px] bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl font-bold text-sm shadow-lg">
-          {accessError}
-        </div>
-      )}
     </div>
   );
 };
 
 export default App;
-
-
