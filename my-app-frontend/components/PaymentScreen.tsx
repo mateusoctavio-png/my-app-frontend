@@ -22,9 +22,9 @@ const BACKEND_URL =
   "https://stripe-backend-ency.onrender.com"; // ✅ troque se sua URL do Render for outra
 
 const PRICE_IDS: Record<SubscriptionPlan, string> = {
-  monthly: "price_1So6v8CJ7mMdErWwHG9Js6eL",
-  semestral: "price_1So6uNCJ7mMdErWw8nR7AouU",
-  annual: "price_1So4jTCJ7mMdErWw5VsOg0uf",
+  monthly: "price_1T9WjbFxLzCeJPzRjVdfM21U",
+  semestral: "price_1T9Wj2FxLzCeJPzRIp7xsddd",
+  annual: "price_1T9WfaFxLzCeJPzRxxt6BNvj",
 };
 
 const PaymentScreen: React.FC<Props> = ({
